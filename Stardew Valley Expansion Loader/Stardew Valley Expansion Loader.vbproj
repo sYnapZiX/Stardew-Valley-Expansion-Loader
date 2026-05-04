@@ -87,6 +87,7 @@
     <Import Include="System.Threading.Tasks" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="GitHubUpdater.vb" />
     <Compile Include="Main.vb">
       <SubType>Form</SubType>
     </Compile>
