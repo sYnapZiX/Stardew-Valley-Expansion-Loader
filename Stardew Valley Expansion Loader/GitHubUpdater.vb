@@ -3,7 +3,7 @@ Imports System.IO.Compression
 Imports System.Net
 Public Class GitHubUpdater
     Shared Property RepositoryOwnerName As String = "sYnapZiX"
-    Shared Property RepositoryName As String = "CleanManager"
+    Shared Property RepositoryName As String = "Stardew-Valley-Expansion-Loader"
     Shared Property AssetFile As String = "Release.zip"
     Public Shared Function Check(Optional Silent As Boolean = False, Optional FourDigitVersionNumber As Boolean = True) As Boolean
         Try
@@ -75,9 +75,10 @@ Public Class GitHubUpdater
                             UpdateScript.WriteLine("echo.")
                             UpdateScript.WriteLine("timeout 5 /NOBREAK")
                             UpdateScript.WriteLine("cls")
-                            UpdateScript.WriteLine("robocopy " & Path.GetTempPath & "GitHubUpdater\" & AssetFile.Replace(".zip", "") & " " & My.Application.Info.DirectoryPath & " /E /MOVE")
+                            UpdateScript.WriteLine("del " & """" & My.Application.Info.DirectoryPath & "\" & My.Application.Info.AssemblyName & ".exe" & """")
+                            UpdateScript.WriteLine("move " & """" & Path.GetTempPath & "GitHubUpdater\Stardew Valley Expansion Loader.exe" & """ """ & My.Application.Info.DirectoryPath & "\" & My.Application.Info.AssemblyName & ".exe" & """")
                             UpdateScript.WriteLine("cls")
-                            UpdateScript.WriteLine("start " & My.Application.Info.DirectoryPath & "\" & My.Application.Info.AssemblyName & ".exe")
+                            UpdateScript.WriteLine("start " & """" & My.Application.Info.DirectoryPath & "\" & My.Application.Info.AssemblyName & ".exe" & """")
                             UpdateScript.WriteLine("exit")
                         End Using
                         Process.Start("cmd", "/c " & """" & Path.GetTempPath & "GitHubUpdater\UpdateScript.cmd" & """")

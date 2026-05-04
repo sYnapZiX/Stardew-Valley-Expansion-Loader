@@ -13,6 +13,10 @@ Public Class Main
     Private Sub Main_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         Hide()
 
+        If GitHubUpdater.Check Then
+            GitHubUpdater.Download()
+        End If
+
         Dim Language As String = Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName
 
         Dim StardewValleyRoamingPath As String = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) & "\StardewValley"
