@@ -14,7 +14,7 @@ Public Class Main
         Hide()
 
         If GitHubUpdater.Check Then
-            GitHubUpdater.Download()
+            GitHubUpdater.Download("Stardew Valley Expansion Loader.exe")
         End If
 
         Dim Language As String = Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName
