@@ -28,8 +28,8 @@ Public Class GitHubUpdater
                 Using UpdateClient As New WebClient
                     Dim UpdateURL As String = "https://github.com/" & Properties.RepositoryOwnerName & "/" & Properties.RepositoryName & "/releases/latest"
                     Dim GitHubPage As String = UpdateClient.DownloadString(UpdateURL)
-                    Dim StartIndex As Integer = GitHubPage.IndexOf("<title>") + 7
-                    Dim EndIndex As Integer = GitHubPage.IndexOf("Â·") - StartIndex - 8
+                    Dim StartIndex As Integer = GitHubPage.IndexOf("<title>")
+                    Dim EndIndex As Integer = GitHubPage.IndexOf("Â·")
                     If StartIndex <> -1 AndAlso EndIndex <> -1 Then
                         Dim CurrentVersion As String = String.Empty
                         Select Case Properties.VersionDigits
@@ -42,7 +42,7 @@ Public Class GitHubUpdater
                             Case Else
                                 CurrentVersion = My.Application.Info.Version.Major.ToString & "." & My.Application.Info.Version.Minor.ToString & "." & My.Application.Info.Version.Build.ToString & "." & My.Application.Info.Version.MinorRevision.ToString
                         End Select
-                        Dim UpdateVersion As String = GitHubPage.Substring(StartIndex, EndIndex).Replace("Release ", "")
+                        Dim UpdateVersion As String = GitHubPage.Substring(StartIndex + 7, EndIndex - StartIndex - 8).Replace("Release ", "")
                         If UpdateVersion = "Releases" Then UpdateVersion = CurrentVersion
                         If Not Properties.Silent AndAlso CurrentVersion <> UpdateVersion Then
                             Dim Result As New DialogResult
