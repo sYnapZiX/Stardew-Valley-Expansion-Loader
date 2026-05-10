@@ -13,9 +13,7 @@ Public Class Main
     Private Sub Main_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         Hide()
 
-        If GitHubUpdater.Check Then
-            GitHubUpdater.Download("Stardew Valley Expansion Loader.exe")
-        End If
+        If GitHubUpdater.Check Then GitHubUpdater.Download("Stardew Valley Expansion Loader.exe")
 
         Dim Language As String = Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName
 
