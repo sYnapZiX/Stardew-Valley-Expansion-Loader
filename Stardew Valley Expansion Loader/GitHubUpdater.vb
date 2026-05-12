@@ -262,9 +262,15 @@
                         GitHubPage = String.Empty
                         If UpdateVersion = "Releases" Then UpdateVersion = CurrentVersion
                         If Not Properties.Silent AndAlso CurrentVersion <> UpdateVersion Then
-                            UserInterface.CheckTrue()
-                            Application.DoEvents()
-                            If Strings.UpdateAvailable = DialogResult.Yes Then Return True
+                            If Strings.UpdateAvailable = DialogResult.Yes Then
+                                UserInterface.CheckTrue()
+                                Application.DoEvents()
+                                Return True
+                            Else
+                                UserInterface.CheckFalse()
+                                Application.DoEvents()
+                                Return False
+                            End If
                         ElseIf CurrentVersion <> UpdateVersion Then
                             UserInterface.CheckTrue()
                             Application.DoEvents()
