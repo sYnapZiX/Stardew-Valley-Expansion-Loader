@@ -5,49 +5,53 @@
         Shared ReadOnly Property RepositoryName As String = "Stardew-Valley-Expansion-Loader"
         Shared ReadOnly Property AssetFile As String = "Release.zip"
 
-        '### THIS PROPERTY WILL TELL THE UPDATER THE LENGTH OF THE VERSION STRING ###
+        '### THIS PROPERTY WILL TELL THE UPDATER THE SEPERATIONS OF THE VERSION STRING ###
         Shared ReadOnly Property VersionSeperations As Byte = 4
 
         '### THIS PROPERTY WILL TELL THE UPDATER TO RUN EITHER SYNCHRONOUSLY (THREAD-LOCKING) OR ASYNCHRONOUSLY ###
         Shared ReadOnly Property Asynchronous As Boolean = False
 
         '### THIS PROPERTY DEFINES THE TEMPORARY FOLDER ###
-        Shared ReadOnly Property TemporaryFolder As String = IO.Path.GetTempPath & "GitHubUpdater"
+        Shared ReadOnly Property TemporaryFolder As String = IO.Path.GetTempPath & ".$" & My.Application.Info.AssemblyName & ".tmp"
+
+        '### THIS PROPERTY, IF BIGGER THEN 1, ENABLES SPLIT ACRHIVES MODE (.s001) ### (SEE: 'https://github.com/sYnapZiX/ArchiveSplitter' FOR MORE INFORMATION)
+        Shared ReadOnly Property AssetParts As Integer = 1
 
         '### THESE PROPERTIES CAN BE SET AT RUNTINE ###
-        Shared Property Retries As Integer = 4 '        NUMBER OF RETRIES FOR CHECKING AND DOWNLOADING
-        Shared Property Silent As Boolean = False '     SHOW/HIDE MESSAGES/PROMTS
-        Shared Property Timeout As Integer = 250 '      WEBCLIENT TIMEOUT
+        Shared Property Enabled As Boolean = True '         ENABLE/DISABLE UPDATE ROUTINE
+        Shared Property Retries As Integer = 4 '            NUMBER OF RETRIES FOR CHECKING AND DOWNLOADING
+        Shared Property Silent As Boolean = False '         SHOW/HIDE MESSAGES/PROMTS
+        Shared Property Timeout As Integer = 250 '          WEBCLIENT TIMEOUT (IN MILLISECONDS)
     End Structure
     Structure UserInterface
-        Public Shared Sub CheckStage1() '                         ### YOUR UI CODE THAT HAPPENS BEFORE CHECKING FOR UPDATES ##############################################################################################################################################################################################################
+        Public Shared Sub CheckStage1() '                                                 ### YOUR UI CODE THAT HAPPENS BEFORE CHECKING FOR UPDATES ###########################################################################################################################################################################################################
 
         End Sub
-        Public Shared Sub CheckTrue() '                           ### YOUR UI CODE THAT HAPPENS IF AN UPDATE IS AVAILABLE ################################################################################################################################################################################################################
+        Public Shared Sub CheckTrue() '                                                   ### YOUR UI CODE THAT HAPPENS IF AN UPDATE IS AVAILABLE #############################################################################################################################################################################################################
 
         End Sub
-        Public Shared Sub CheckFalse() '                          ### YOUR UI CODE THAT HAPPENS IF NO UPDATE IS AVAILABLE ################################################################################################################################################################################################################
+        Public Shared Sub CheckFalse() '                                                  ### YOUR UI CODE THAT HAPPENS IF NO UPDATE IS AVAILABLE #############################################################################################################################################################################################################
 
         End Sub
-        Public Shared Sub CheckFailed() '                         ### YOUR UI CODE THAT HAPPENS IF THE UPDATE CHECK HAS FAILED ###########################################################################################################################################################################################################
+        Public Shared Sub CheckFailed() '                                                 ### YOUR UI CODE THAT HAPPENS IF THE UPDATE CHECK HAS FAILED ########################################################################################################################################################################################################
 
         End Sub
-        Public Shared Sub DownloadProgress(Progress As Integer) ' ### YOUR UI CODE THAT HAPPENS DURING DOWNLOAD ##########################################################################################################################################################################################################################
+        Public Shared Sub DownloadProgress(Progress As Integer, AssetPart As Integer) '   ### YOUR UI CODE THAT HAPPENS DURING DOWNLOAD #######################################################################################################################################################################################################################
 
         End Sub
-        Public Shared Sub UpdateStage1() '                        ### YOUR UI CODE THAT HAPPENS BEFORE ARCHIVE EXTRACTION ################################################################################################################################################################################################################
+        Public Shared Sub UpdateStage1() '                                                ### YOUR UI CODE THAT HAPPENS BEFORE ARCHIVE EXTRACTION #############################################################################################################################################################################################################
 
         End Sub
-        Public Shared Sub UpdateStage2() '                        ### YOUR UI CODE THAT HAPPENS BEFORE ARCHIVE DELETION ##################################################################################################################################################################################################################
+        Public Shared Sub UpdateStage2() '                                                ### YOUR UI CODE THAT HAPPENS BEFORE ARCHIVE DELETION ###############################################################################################################################################################################################################
 
         End Sub
-        Public Shared Sub UpdateStage3() '                        ### YOUR UI CODE THAT HAPPENS BEFORE UPDATESCRIPT IS CREATED ###########################################################################################################################################################################################################
+        Public Shared Sub UpdateStage3() '                                                ### YOUR UI CODE THAT HAPPENS BEFORE UPDATESCRIPT IS CREATED ########################################################################################################################################################################################################
 
         End Sub
-        Public Shared Sub UpdateStage4() '                        ### YOUR UI CODE THAT HAPPENS BEFORE UPDATESCRIPT IS LAUNCHED ##########################################################################################################################################################################################################
+        Public Shared Sub UpdateStage4() '                                                ### YOUR UI CODE THAT HAPPENS BEFORE UPDATESCRIPT IS LAUNCHED #######################################################################################################################################################################################################
 
         End Sub
-        Public Shared Sub DownloadFailed() '                      ### YOUR UI CODE THAT HAPPENS WHEN THE DOWNLOAD HAS FAILED #############################################################################################################################################################################################################
+        Public Shared Sub DownloadFailed() '                                              ### YOUR UI CODE THAT HAPPENS WHEN THE DOWNLOAD HAS FAILED ##########################################################################################################################################################################################################
 
         End Sub
     End Structure
@@ -59,43 +63,183 @@
     '####################################################################################################################################################################################################################################################################################################################################
     Structure Handler
         Public Shared Sub DownloadProgressAsynchronous(sender As Object, e As Net.DownloadProgressChangedEventArgs)
-            UserInterface.DownloadProgress(e.ProgressPercentage)
+            UserInterface.DownloadProgress(e.ProgressPercentage, TemporaryBuffer.FileCount)
         End Sub
         Public Shared Sub DownloadFinishedAsynchronous(sender As Object, e As ComponentModel.AsyncCompletedEventArgs)
+            Application.DoEvents()
+            UserInterface.DownloadProgress(0, TemporaryBuffer.FileCount)
+            Application.DoEvents()
+
             If Not e.Cancelled Then
-                Dim DownloadTarget As String = Properties.TemporaryFolder & "\" & Properties.AssetFile
-                Dim TargetFolder As String = My.Application.Info.DirectoryPath
-                Dim LaunchExecutable As String = TargetFolder & "\" & IO.Path.GetFileName(Application.ExecutablePath)
-                If Properties.AssetFile.EndsWith(".zip") Then
+                If Properties.AssetParts = 1 Then
+                    Dim DownloadTarget As String = Properties.TemporaryFolder & "\" & Properties.AssetFile
                     Dim ExtractionTarget As String = DownloadTarget.Replace(".zip", "")
+
+                    Application.DoEvents()
                     UserInterface.UpdateStage1()
                     Application.DoEvents()
+
                     IO.Compression.ZipFile.ExtractToDirectory(DownloadTarget, ExtractionTarget)
+
+                    Application.DoEvents()
                     UserInterface.UpdateStage2()
                     Application.DoEvents()
+
                     IO.File.Delete(DownloadTarget)
+
+                    Application.DoEvents()
                     UserInterface.UpdateStage3()
                     Application.DoEvents()
-                    UpdateScript.Create(TemporaryBuffer.ExecutableToMove, ExtractionTarget, LaunchExecutable, TargetFolder)
+
+                    UpdateScript.Create(TemporaryBuffer.ExecutableToMove, ExtractionTarget, TemporaryBuffer.LaunchExecutable, TemporaryBuffer.TargetFolder)
+
+                    Application.DoEvents()
                     UserInterface.UpdateStage4()
                     Application.DoEvents()
+
                     UpdateScript.Run()
                     End
+                ElseIf Properties.AssetParts > 1 Then
+                    If TemporaryBuffer.FileCount = Properties.AssetParts Then
+                        Dim DownloadTarget As String = Properties.TemporaryFolder & "\" & Properties.AssetFile & ".s" & TemporaryBuffer.FileCount.ToString("000")
+                        Dim ExtractionTarget As String = Properties.TemporaryFolder & "\" & Properties.AssetFile.Replace(".zip", "")
+                        Try
+                            For i = 1 To Properties.AssetParts
+                                Dim CurrentPart As String = Properties.TemporaryFolder & "\" & Properties.AssetFile & ".s" & i.ToString("000")
+                                If IO.File.Exists(CurrentPart) Then
+                                    Dim FileLength As Long = New IO.FileInfo(CurrentPart).Length
+                                    Dim Append As Boolean = False
+                                    If i = 1 Then
+                                        Append = False
+                                    Else
+                                        Append = True
+                                    End If
+                                    Using FileWriter As New IO.StreamWriter(Properties.TemporaryFolder & "\" & Properties.AssetFile, Append, Text.Encoding.Default)
+                                        FileWriter.Write(IO.File.ReadAllText(CurrentPart, Text.Encoding.Default))
+                                        FileWriter.Flush()
+                                        FileWriter.Close()
+                                    End Using
+                                    IO.File.Delete(CurrentPart)
+                                Else
+                                    Exit For
+                                End If
+                            Next
+                        Catch
+                            TemporaryBuffer.ExecutableToMove = ""
+
+                            Application.DoEvents()
+                            UserInterface.DownloadFailed()
+                            Application.DoEvents()
+                        End Try
+
+                        Application.DoEvents()
+                        UserInterface.UpdateStage1()
+                        Application.DoEvents()
+
+                        IO.Compression.ZipFile.ExtractToDirectory(Properties.TemporaryFolder & "\" & Properties.AssetFile, Properties.TemporaryFolder & "\" & Properties.AssetFile.Replace(".zip", ""))
+
+                        Application.DoEvents()
+                        UserInterface.UpdateStage2()
+                        Application.DoEvents()
+
+                        IO.File.Delete(Properties.TemporaryFolder & "\" & Properties.AssetFile)
+
+                        Application.DoEvents()
+                        UserInterface.UpdateStage3()
+                        Application.DoEvents()
+
+                        UpdateScript.Create(TemporaryBuffer.ExecutableToMove, ExtractionTarget, TemporaryBuffer.LaunchExecutable, TemporaryBuffer.TargetFolder)
+
+                        Application.DoEvents()
+                        UserInterface.UpdateStage4()
+                        Application.DoEvents()
+
+                        UpdateScript.Run()
+                        End
+                    Else
+                        RemoveHandler TemporaryBuffer.AsynchronousWebClient.DownloadProgressChanged, AddressOf DownloadProgressAsynchronous
+                        RemoveHandler TemporaryBuffer.AsynchronousWebClient.DownloadFileCompleted, AddressOf DownloadFinishedAsynchronous
+                        TemporaryBuffer.FileCount += 1
+                        Download(TemporaryBuffer.ExecutableToMove, "https://github.com/" & Properties.RepositoryOwnerName & "/" & Properties.RepositoryName & "/releases/latest/download/" & Properties.AssetFile & ".s" & TemporaryBuffer.FileCount.ToString("000"), Properties.TemporaryFolder & "\" & Properties.AssetFile & ".s" & TemporaryBuffer.FileCount.ToString("000"))
+                    End If
                 End If
             Else
                 For i = 1 To Properties.Retries
                     If i = Properties.Retries Then
                         TemporaryBuffer.ExecutableToMove = ""
+                        Application.DoEvents()
                         UserInterface.DownloadFailed()
                         Application.DoEvents()
                     Else
-                        Download()
+                        If Properties.AssetParts > 1 AndAlso Not TemporaryBuffer.FileCount = Properties.AssetParts Then
+                            Download(TemporaryBuffer.ExecutableToMove, "https://github.com/" & Properties.RepositoryOwnerName & "/" & Properties.RepositoryName & "/releases/latest/download/" & Properties.TemporaryFolder & "\" & Properties.AssetFile & ".s" & TemporaryBuffer.FileCount.ToString("000"), Properties.TemporaryFolder & "\" & Properties.AssetFile & ".s" & TemporaryBuffer.FileCount.ToString("000"))
+                        Else
+                            Download()
+                        End If
                     End If
                 Next
             End If
         End Sub
     End Structure
     Structure Strings
+        Public Shared Function NoInternetConnection() As DialogResult
+            Dim Result As New DialogResult
+            If Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName = "de" Then '     GERMAN
+                Result = MessageBox.Show("Es kann keine Internetverbindung hergestellt werden." & vbNewLine & "Möchten Sie es erneut versuchen?", "GitHub Updater", MessageBoxButtons.RetryCancel, MessageBoxIcon.Exclamation)
+            ElseIf Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName = "es" Then ' SPANISH
+                Result = MessageBox.Show("No se puede establecer una conexión a Internet." & vbNewLine & "¿Quieres volver a intentarlo?", "GitHub Updater", MessageBoxButtons.RetryCancel, MessageBoxIcon.Exclamation)
+            ElseIf Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName = "fr" Then ' FRANCE
+                Result = MessageBox.Show("Impossible d'établir une connexion Internet." & vbNewLine & "Voulez-vous réessayer ?", "GitHub Updater", MessageBoxButtons.RetryCancel, MessageBoxIcon.Exclamation)
+            ElseIf Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName = "hu" Then ' HUNGARIAN
+                Result = MessageBox.Show("Nem sikerült internetkapcsolatot létesíteni." & vbNewLine & "Megpróbálja újra?", "GitHub Updater", MessageBoxButtons.RetryCancel, MessageBoxIcon.Exclamation)
+            ElseIf Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName = "it" Then ' ITALIAN
+                Result = MessageBox.Show("Impossibile stabilire una connessione a Internet." & vbNewLine & "Vuoi riprovare?", "GitHub Updater", MessageBoxButtons.RetryCancel, MessageBoxIcon.Exclamation)
+            ElseIf Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName = "ja" Then ' JAPANESE
+                Result = MessageBox.Show("インターネットに接続できません。" & vbNewLine & "もう一度試しますか？", "GitHub Updater", MessageBoxButtons.RetryCancel, MessageBoxIcon.Exclamation)
+            ElseIf Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName = "ko" Then ' KOREAN
+                Result = MessageBox.Show("인터넷 연결을 할 수 없습니다." & vbNewLine & "다시 시도하시겠습니까?", "GitHub Updater", MessageBoxButtons.RetryCancel, MessageBoxIcon.Exclamation)
+            ElseIf Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName = "pt" Then ' PORTUGUESE (BRASILIAN)
+                Result = MessageBox.Show("Não foi possível estabelecer uma conexão com a Internet." & vbNewLine & "Deseja tentar novamente?", "GitHub Updater", MessageBoxButtons.RetryCancel, MessageBoxIcon.Exclamation)
+            ElseIf Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName = "ru" Then ' RUSSIAN
+                Result = MessageBox.Show("Не удалось установить подключение к Интернету." & vbNewLine & "Попробовать ещё раз?", "GitHub Updater", MessageBoxButtons.RetryCancel, MessageBoxIcon.Exclamation)
+            ElseIf Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName = "tr" Then ' TURKISH
+                Result = MessageBox.Show("İnternet bağlantısı kurulamıyor." & vbNewLine & "Tekrar denemek ister misiniz?", "GitHub Updater", MessageBoxButtons.RetryCancel, MessageBoxIcon.Exclamation)
+            ElseIf Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName = "zh" Then ' CHINESE (SIMPLIFIED)
+                Result = MessageBox.Show("无法建立互联网连接。" & vbNewLine & "要重试吗？", "GitHub Updater", MessageBoxButtons.RetryCancel, MessageBoxIcon.Exclamation)
+            Else '                                                                                      ENGLISH
+                Result = MessageBox.Show("Unable to establish an internet connection." & vbNewLine & "Try again?", "GitHub Updater", MessageBoxButtons.RetryCancel, MessageBoxIcon.Exclamation)
+            End If
+            Return Result
+        End Function
+        Public Shared Function ServerUnreachable() As DialogResult
+            Dim Result As New DialogResult
+            If Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName = "de" Then '     GERMAN
+                Result = MessageBox.Show("Es kann keine Verbindung zu GitHub hergestellt werden." & vbNewLine & "Möchten Sie es erneut versuchen?", "GitHub Updater", MessageBoxButtons.RetryCancel, MessageBoxIcon.Exclamation)
+            ElseIf Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName = "es" Then ' SPANISH
+                Result = MessageBox.Show("No se ha podido establecer una conexión con GitHub." & vbNewLine & "¿Quieres volver a intentarlo?", "GitHub Updater", MessageBoxButtons.RetryCancel, MessageBoxIcon.Exclamation)
+            ElseIf Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName = "fr" Then ' FRANCE
+                Result = MessageBox.Show("Impossible d'établir une connexion à GitHub." & vbNewLine & "Voulez-vous réessayer ?", "GitHub Updater", MessageBoxButtons.RetryCancel, MessageBoxIcon.Exclamation)
+            ElseIf Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName = "hu" Then ' HUNGARIAN
+                Result = MessageBox.Show("Nem sikerült kapcsolatot létesíteni a GitHubbal." & vbNewLine & "Megpróbálja újra?", "GitHub Updater", MessageBoxButtons.RetryCancel, MessageBoxIcon.Exclamation)
+            ElseIf Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName = "it" Then ' ITALIAN
+                Result = MessageBox.Show("Impossibile stabilire una connessione con GitHub." & vbNewLine & "Vuoi riprovare?", "GitHub Updater", MessageBoxButtons.RetryCancel, MessageBoxIcon.Exclamation)
+            ElseIf Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName = "ja" Then ' JAPANESE
+                Result = MessageBox.Show("GitHubへの接続が確立できませんでした。" & vbNewLine & "もう一度試しますか？", "GitHub Updater", MessageBoxButtons.RetryCancel, MessageBoxIcon.Exclamation)
+            ElseIf Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName = "ko" Then ' KOREAN
+                Result = MessageBox.Show("GitHub에 연결할 수 없습니다." & vbNewLine & "다시 시도하시겠습니까?", "GitHub Updater", MessageBoxButtons.RetryCancel, MessageBoxIcon.Exclamation)
+            ElseIf Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName = "pt" Then ' PORTUGUESE (BRASILIAN)
+                Result = MessageBox.Show("Não foi possível estabelecer uma conexão com o GitHub." & vbNewLine & "Deseja tentar novamente?", "GitHub Updater", MessageBoxButtons.RetryCancel, MessageBoxIcon.Exclamation)
+            ElseIf Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName = "ru" Then ' RUSSIAN
+                Result = MessageBox.Show("Не удалось установить соединение с GitHub." & vbNewLine & "Попробовать ещё раз?", "GitHub Updater", MessageBoxButtons.RetryCancel, MessageBoxIcon.Exclamation)
+            ElseIf Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName = "tr" Then ' TURKISH
+                Result = MessageBox.Show("GitHub'a bağlantı kurulamıyor." & vbNewLine & "Tekrar denemek ister misiniz?", "GitHub Updater", MessageBoxButtons.RetryCancel, MessageBoxIcon.Exclamation)
+            ElseIf Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName = "zh" Then ' CHINESE (SIMPLIFIED)
+                Result = MessageBox.Show("无法连接到 GitHub。" & vbNewLine & "要重试吗？", "GitHub Updater", MessageBoxButtons.RetryCancel, MessageBoxIcon.Exclamation)
+            Else '                                                                                      ENGLISH
+                Result = MessageBox.Show("Unable to establish a connection to GitHub." & vbNewLine & "Try again?", "GitHub Updater", MessageBoxButtons.RetryCancel, MessageBoxIcon.Exclamation)
+            End If
+            Return Result
+        End Function
         Public Shared Function UpdateAvailable() As DialogResult
             Dim Result As New DialogResult
             If Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName = "de" Then '     GERMAN
@@ -154,7 +298,13 @@
         End Sub
     End Structure
     Structure TemporaryBuffer
+        Shared AsynchronousWebClient As Net.WebClient
+        Shared DownloadTarget As String = ""
         Shared ExecutableToMove As String = ""
+        Shared FileCount As Integer = 1
+        Shared UpdateURL As String = ""
+        Shared ReadOnly TargetFolder As String = My.Application.Info.DirectoryPath
+        Shared ReadOnly LaunchExecutable As String = TargetFolder & "\" & IO.Path.GetFileName(Application.ExecutablePath)
     End Structure
     Structure UpdateScript
         Public Shared Sub Create(ExecutableToMove As String, ExtractionTarget As String, LaunchExecutable As String, TargetFolder As String)
@@ -218,132 +368,296 @@
         End Sub
     End Structure
     Public Shared Sub CleanupTemporaryFiles()
-        Try
-            If IO.Directory.Exists(Properties.TemporaryFolder) Then IO.Directory.Delete(Properties.TemporaryFolder, True)
-        Catch
-        End Try
+        If IO.Directory.Exists(Properties.TemporaryFolder) Then IO.Directory.Delete(Properties.TemporaryFolder, True)
     End Sub
     Public Shared Function Check() As Boolean
-        Try
-            CleanupTemporaryFiles()
-            If My.Computer.Network.Ping("www.github.com", Properties.Timeout) Then
-                Using UpdateClient As New Net.WebClient
-                    Dim UpdateURL As String = "https://github.com/" & Properties.RepositoryOwnerName & "/" & Properties.RepositoryName & "/releases/latest"
-                    Dim GitHubBuffer As New Char()
-                    UserInterface.CheckStage1()
-                    Application.DoEvents()
-                    Dim GitHubPage As String = String.Empty
-                    For i = 1 To Properties.Retries
-                        If i = Properties.Retries Then
-                            GitHubPage = UpdateClient.DownloadString(UpdateURL)
-                        Else
-                            Try
-                                GitHubPage = UpdateClient.DownloadString(UpdateURL)
-                            Catch
-                            End Try
-                        End If
-                        If Not GitHubPage = String.Empty Then Exit For
-                    Next
-                    Dim StartIndex As Integer = GitHubPage.IndexOf("<title>")
-                    Dim EndIndex As Integer = GitHubPage.IndexOf("Â·")
-                    If StartIndex <> -1 AndAlso EndIndex <> -1 Then
-                        Dim CurrentVersion As String = String.Empty
-                        Select Case Properties.VersionSeperations
-                            Case 1
-                                CurrentVersion = My.Application.Info.Version.Major.ToString
-                            Case 2
-                                CurrentVersion = My.Application.Info.Version.Major.ToString & "." & My.Application.Info.Version.Minor.ToString
-                            Case 3
-                                CurrentVersion = My.Application.Info.Version.Major.ToString & "." & My.Application.Info.Version.Minor.ToString & "." & My.Application.Info.Version.Build.ToString
-                            Case Else
-                                CurrentVersion = My.Application.Info.Version.Major.ToString & "." & My.Application.Info.Version.Minor.ToString & "." & My.Application.Info.Version.Build.ToString & "." & My.Application.Info.Version.MinorRevision.ToString
-                        End Select
-                        Dim UpdateVersion As String = GitHubPage.Substring(StartIndex + 7, EndIndex - StartIndex - 8).Remove(0, 8)
-                        GitHubPage = String.Empty
-                        If UpdateVersion = "Releases" Then UpdateVersion = CurrentVersion
-                        If Not Properties.Silent AndAlso CurrentVersion <> UpdateVersion Then
-                            If Strings.UpdateAvailable = DialogResult.Yes Then
-                                UserInterface.CheckTrue()
-                                Application.DoEvents()
-                                Return True
-                            Else
-                                UserInterface.CheckFalse()
-                                Application.DoEvents()
-                                Return False
-                            End If
-                        ElseIf CurrentVersion <> UpdateVersion Then
-                            UserInterface.CheckTrue()
+        If Properties.Enabled Then
+            Try
+                CleanupTemporaryFiles()
+                If My.Computer.Network.IsAvailable Then
+                    If My.Computer.Network.Ping("www.github.com", Properties.Timeout) Then
+                        Using UpdateClient As New Net.WebClient
+                            TemporaryBuffer.UpdateURL = "https://github.com/" & Properties.RepositoryOwnerName & "/" & Properties.RepositoryName & "/releases/latest"
+
                             Application.DoEvents()
-                            Return True
+                            UserInterface.CheckStage1()
+                            Application.DoEvents()
+
+                            Dim GitHubPage As String = String.Empty
+
+                            For i = 1 To Properties.Retries
+                                If i = Properties.Retries Then
+                                    GitHubPage = UpdateClient.DownloadString(TemporaryBuffer.UpdateURL)
+                                Else
+                                    Try
+                                        GitHubPage = UpdateClient.DownloadString(TemporaryBuffer.UpdateURL)
+                                    Catch
+                                    End Try
+                                End If
+                                If Not GitHubPage = String.Empty Then Exit For
+                            Next
+
+                            Dim StartIndex As Integer = GitHubPage.IndexOf("<title>")
+                            Dim EndIndex As Integer = GitHubPage.IndexOf("Â·")
+
+                            If StartIndex <> -1 AndAlso EndIndex <> -1 Then
+                                Dim CurrentVersion As String = String.Empty
+                                Select Case Properties.VersionSeperations
+                                    Case 1
+                                        CurrentVersion = My.Application.Info.Version.Major.ToString
+                                    Case 2
+                                        CurrentVersion = My.Application.Info.Version.Major.ToString & "." & My.Application.Info.Version.Minor.ToString
+                                    Case 3
+                                        CurrentVersion = My.Application.Info.Version.Major.ToString & "." & My.Application.Info.Version.Minor.ToString & "." & My.Application.Info.Version.Build.ToString
+                                    Case Else
+                                        CurrentVersion = My.Application.Info.Version.Major.ToString & "." & My.Application.Info.Version.Minor.ToString & "." & My.Application.Info.Version.Build.ToString & "." & My.Application.Info.Version.MinorRevision.ToString
+                                End Select
+
+                                Dim UpdateVersion As String = GitHubPage.Substring(StartIndex + 7, EndIndex - StartIndex - 8).Remove(0, 8)
+                                GitHubPage = String.Empty
+                                If UpdateVersion = "Releases" Then UpdateVersion = CurrentVersion
+
+                                If Not Properties.Silent AndAlso CurrentVersion <> UpdateVersion Then
+                                    If Strings.UpdateAvailable = DialogResult.Yes Then
+                                        Application.DoEvents()
+                                        UserInterface.CheckTrue()
+                                        Application.DoEvents()
+                                        Return True
+                                    Else
+                                        Application.DoEvents()
+                                        UserInterface.CheckFalse()
+                                        Application.DoEvents()
+                                        Return False
+                                    End If
+                                ElseIf CurrentVersion <> UpdateVersion Then
+                                    Application.DoEvents()
+                                    UserInterface.CheckTrue()
+                                    Application.DoEvents()
+                                    Return True
+                                Else
+                                    Application.DoEvents()
+                                    UserInterface.CheckFalse()
+                                    Application.DoEvents()
+                                End If
+                            End If
+                        End Using
+                    Else
+                        If Strings.ServerUnreachable = DialogResult.Retry Then
+                            Check()
                         Else
-                            UserInterface.CheckFalse()
+                            Application.DoEvents()
+                            UserInterface.CheckFailed()
                             Application.DoEvents()
                         End If
                     End If
-                End Using
-            End If
-        Catch
-            UserInterface.CheckFailed()
-            Application.DoEvents()
-            If Not Properties.Silent Then
-                Strings.UpdateCheckFailed()
-            End If
-        End Try
+                Else
+                    If Strings.NoInternetConnection = DialogResult.Retry Then
+                        Check()
+                    Else
+                        Application.DoEvents()
+                        UserInterface.CheckFailed()
+                        Application.DoEvents()
+                    End If
+                End If
+            Catch
+                Application.DoEvents()
+                UserInterface.CheckFailed()
+                Application.DoEvents()
+                If Not Properties.Silent Then Strings.UpdateCheckFailed()
+            End Try
+        Else
+            Try
+                CleanupTemporaryFiles()
+            Catch
+            End Try
+        End If
         Return False
     End Function
-    Public Shared Sub Download(Optional ExecutableToMove As String = "")
+    Public Shared Sub Download(Optional ExecutableToMove As String = "", Optional UpdateURLOverride As String = "", Optional DownloadTargetOverride As String = "")
         Try
-            If My.Computer.Network.Ping("www.github.com", Properties.Timeout) Then
-                If Not IO.Directory.Exists(Properties.TemporaryFolder) Then
-                    IO.Directory.CreateDirectory(Properties.TemporaryFolder)
-                Else
-                    IO.Directory.Delete(Properties.TemporaryFolder, True)
-                    IO.Directory.CreateDirectory(Properties.TemporaryFolder)
-                End If
-                Using UpdateClient As New Net.WebClient
-                    If Properties.Asynchronous Then
-                        Dim UpdateURL As String = "https://github.com/" & Properties.RepositoryOwnerName & "/" & Properties.RepositoryName & "/releases/latest/download/" & Properties.AssetFile
-                        Dim DownloadTarget As String = Properties.TemporaryFolder & "\" & Properties.AssetFile
-                        AddHandler UpdateClient.DownloadProgressChanged, AddressOf Handler.DownloadProgressAsynchronous
-                        AddHandler UpdateClient.DownloadFileCompleted, AddressOf Handler.DownloadFinishedAsynchronous
-                        TemporaryBuffer.ExecutableToMove = ExecutableToMove
-                        UpdateClient.DownloadFileAsync(New Uri(UpdateURL), DownloadTarget)
-                    Else
-                        Dim UpdateURL As String = "https://github.com/" & Properties.RepositoryOwnerName & "/" & Properties.RepositoryName & "/releases/latest/download/" & Properties.AssetFile
-                        Dim DownloadTarget As String = Properties.TemporaryFolder & "\" & Properties.AssetFile
-                        Dim TargetFolder As String = My.Application.Info.DirectoryPath
-                        Dim LaunchExecutable As String = TargetFolder & "\" & IO.Path.GetFileName(Application.ExecutablePath)
-                        For i = 1 To Properties.Retries
-                            If i = Properties.Retries Then
-                                UpdateClient.DownloadFile(UpdateURL, DownloadTarget)
-                            Else
-                                Try
-                                    UpdateClient.DownloadFile(UpdateURL, DownloadTarget)
-                                Catch
-                                End Try
-                            End If
-                            If IO.File.Exists(DownloadTarget) Then Exit For
-                        Next
-                        If Properties.AssetFile.EndsWith(".zip") Then
-                            Dim ExtractionTarget As String = DownloadTarget.Replace(".zip", "")
-                            UserInterface.UpdateStage1()
-                            Application.DoEvents()
-                            IO.Compression.ZipFile.ExtractToDirectory(DownloadTarget, ExtractionTarget)
-                            UserInterface.UpdateStage2()
-                            Application.DoEvents()
-                            IO.File.Delete(DownloadTarget)
-                            UserInterface.UpdateStage3()
-                            Application.DoEvents()
-                            UpdateScript.Create(ExecutableToMove, ExtractionTarget, LaunchExecutable, TargetFolder)
-                            UserInterface.UpdateStage4()
-                            Application.DoEvents()
-                            UpdateScript.Run()
-                            End
+            If My.Computer.Network.IsAvailable Then
+                If My.Computer.Network.Ping("www.github.com", Properties.Timeout) Then
+                    If UpdateURLOverride = "" AndAlso DownloadTargetOverride = "" Then
+                        If Not IO.Directory.Exists(Properties.TemporaryFolder) Then
+                            IO.Directory.CreateDirectory(Properties.TemporaryFolder)
+                        Else
+                            IO.Directory.Delete(Properties.TemporaryFolder, True)
+                            IO.Directory.CreateDirectory(Properties.TemporaryFolder)
                         End If
                     End If
-                End Using
+                    If Properties.Asynchronous Then
+                        If UpdateURLOverride = "" Then
+                            TemporaryBuffer.UpdateURL = "https://github.com/" & Properties.RepositoryOwnerName & "/" & Properties.RepositoryName & "/releases/latest/download/" & Properties.AssetFile
+                        Else
+                            TemporaryBuffer.UpdateURL = UpdateURLOverride
+                        End If
+                        If DownloadTargetOverride = "" Then
+                            TemporaryBuffer.DownloadTarget = Properties.TemporaryFolder & "\" & Properties.AssetFile
+                        Else
+                            TemporaryBuffer.DownloadTarget = DownloadTargetOverride
+                        End If
+                        TemporaryBuffer.AsynchronousWebClient = New Net.WebClient
+                        AddHandler TemporaryBuffer.AsynchronousWebClient.DownloadProgressChanged, AddressOf Handler.DownloadProgressAsynchronous
+                        AddHandler TemporaryBuffer.AsynchronousWebClient.DownloadFileCompleted, AddressOf Handler.DownloadFinishedAsynchronous
+                        TemporaryBuffer.ExecutableToMove = ExecutableToMove
+                        TemporaryBuffer.AsynchronousWebClient.DownloadFileAsync(New Uri(TemporaryBuffer.UpdateURL), TemporaryBuffer.DownloadTarget)
+                    Else
+                        Using UpdateClient As New Net.WebClient
+                            If Properties.AssetParts = 1 Then
+                                If UpdateURLOverride = "" Then
+                                    TemporaryBuffer.UpdateURL = "https://github.com/" & Properties.RepositoryOwnerName & "/" & Properties.RepositoryName & "/releases/latest/download/" & Properties.AssetFile
+                                Else
+                                    TemporaryBuffer.UpdateURL = UpdateURLOverride
+                                End If
+                                If DownloadTargetOverride = "" Then
+                                    TemporaryBuffer.DownloadTarget = Properties.TemporaryFolder & "\" & Properties.AssetFile
+                                Else
+                                    TemporaryBuffer.DownloadTarget = DownloadTargetOverride
+                                End If
+                                For i = 1 To Properties.Retries
+                                    If i = Properties.Retries Then
+                                        UpdateClient.DownloadFile(TemporaryBuffer.UpdateURL, TemporaryBuffer.DownloadTarget)
+                                    Else
+                                        Try
+                                            UpdateClient.DownloadFile(TemporaryBuffer.UpdateURL, TemporaryBuffer.DownloadTarget)
+                                        Catch
+                                        End Try
+                                    End If
+                                    If IO.File.Exists(TemporaryBuffer.DownloadTarget) Then Exit For
+                                Next
+                                If IO.File.Exists(TemporaryBuffer.DownloadTarget) Then
+                                    Dim ExtractionTarget As String = TemporaryBuffer.DownloadTarget.Replace(".zip", "")
+
+                                    Application.DoEvents()
+                                    UserInterface.UpdateStage1()
+                                    Application.DoEvents()
+
+                                    IO.Compression.ZipFile.ExtractToDirectory(TemporaryBuffer.DownloadTarget, ExtractionTarget)
+
+                                    Application.DoEvents()
+                                    UserInterface.UpdateStage2()
+                                    Application.DoEvents()
+
+                                    IO.File.Delete(TemporaryBuffer.DownloadTarget)
+
+                                    Application.DoEvents()
+                                    UserInterface.UpdateStage3()
+                                    Application.DoEvents()
+
+                                    UpdateScript.Create(ExecutableToMove, ExtractionTarget, TemporaryBuffer.LaunchExecutable, TemporaryBuffer.TargetFolder)
+
+                                    Application.DoEvents()
+                                    UserInterface.UpdateStage4()
+                                    Application.DoEvents()
+
+                                    UpdateScript.Run()
+                                    End
+                                Else
+                                    Application.DoEvents()
+                                    UserInterface.DownloadFailed()
+                                    Application.DoEvents()
+                                End If
+                            ElseIf Properties.AssetParts > 1 Then
+                                For i = 1 To Properties.AssetParts
+                                    If UpdateURLOverride = "" Then
+                                        TemporaryBuffer.UpdateURL = "https://github.com/" & Properties.RepositoryOwnerName & "/" & Properties.RepositoryName & "/releases/latest/download/" & Properties.AssetFile & ".s" & i.ToString("000")
+                                    Else
+                                        TemporaryBuffer.UpdateURL = UpdateURLOverride
+                                    End If
+                                    If DownloadTargetOverride = "" Then
+                                        TemporaryBuffer.DownloadTarget = Properties.TemporaryFolder & "\" & Properties.AssetFile & ".s" & i.ToString("000")
+                                    Else
+                                        TemporaryBuffer.DownloadTarget = DownloadTargetOverride
+                                    End If
+                                    For i2 = 1 To Properties.Retries
+                                        Try
+                                            UpdateClient.DownloadFile(TemporaryBuffer.UpdateURL, TemporaryBuffer.DownloadTarget)
+                                        Catch
+                                        End Try
+                                        If IO.File.Exists(TemporaryBuffer.DownloadTarget) Then Exit For
+                                    Next
+                                    If i = Properties.AssetParts Then Exit For
+                                Next
+                                Try
+                                    For i = 1 To Properties.AssetParts
+                                        If IO.File.Exists(Properties.TemporaryFolder & "\" & Properties.AssetFile & ".s" & i.ToString("000")) Then
+                                            Dim FileLength As Long = New IO.FileInfo(Properties.TemporaryFolder & "\" & Properties.AssetFile & ".s" & i.ToString("000")).Length
+                                            Dim Append As Boolean = False
+                                            If i = 1 Then
+                                                Append = False
+                                            Else
+                                                Append = True
+                                            End If
+                                            Using FileWriter As New IO.StreamWriter(Properties.TemporaryFolder & "\" & Properties.AssetFile, Append, Text.Encoding.Default)
+                                                FileWriter.Write(IO.File.ReadAllText(Properties.TemporaryFolder & "\" & Properties.AssetFile & ".s" & i.ToString("000"), Text.Encoding.Default))
+                                                FileWriter.Flush()
+                                                FileWriter.Close()
+                                            End Using
+                                            IO.File.Delete(Properties.TemporaryFolder & "\" & Properties.AssetFile & ".s" & i.ToString("000"))
+                                        Else
+                                            Exit For
+                                        End If
+                                    Next
+                                    If IO.File.Exists(Properties.TemporaryFolder & "\" & Properties.AssetFile) Then
+                                        Dim ExtractionTarget As String = Properties.TemporaryFolder & "\" & Properties.AssetFile.Replace(".zip", "")
+
+                                        Application.DoEvents()
+                                        UserInterface.UpdateStage1()
+                                        Application.DoEvents()
+
+                                        IO.Compression.ZipFile.ExtractToDirectory(Properties.TemporaryFolder & "\" & Properties.AssetFile, ExtractionTarget)
+
+                                        Application.DoEvents()
+                                        UserInterface.UpdateStage2()
+                                        Application.DoEvents()
+
+                                        IO.File.Delete(Properties.TemporaryFolder & "\" & Properties.AssetFile)
+
+                                        Application.DoEvents()
+                                        UserInterface.UpdateStage3()
+                                        Application.DoEvents()
+
+                                        UpdateScript.Create(ExecutableToMove, ExtractionTarget, TemporaryBuffer.LaunchExecutable, TemporaryBuffer.TargetFolder)
+
+                                        Application.DoEvents()
+                                        UserInterface.UpdateStage4()
+                                        Application.DoEvents()
+
+                                        UpdateScript.Run()
+                                        End
+                                    Else
+                                        Application.DoEvents()
+                                        UserInterface.DownloadFailed()
+                                        Application.DoEvents()
+                                    End If
+                                Catch
+                                    Application.DoEvents()
+                                    UserInterface.DownloadFailed()
+                                    Application.DoEvents()
+                                End Try
+                            End If
+                        End Using
+                    End If
+                Else
+                    If Strings.ServerUnreachable = DialogResult.Retry Then
+                        Download(ExecutableToMove, UpdateURLOverride, DownloadTargetOverride)
+                    Else
+                        Application.DoEvents()
+                        UserInterface.DownloadFailed()
+                        Application.DoEvents()
+                    End If
+                End If
+            Else
+                If Strings.NoInternetConnection = DialogResult.Retry Then
+                    Download(ExecutableToMove, UpdateURLOverride, DownloadTargetOverride)
+                Else
+                    Application.DoEvents()
+                    UserInterface.DownloadFailed()
+                    Application.DoEvents()
+                End If
             End If
         Catch
+            Application.DoEvents()
             UserInterface.DownloadFailed()
             Application.DoEvents()
         End Try
