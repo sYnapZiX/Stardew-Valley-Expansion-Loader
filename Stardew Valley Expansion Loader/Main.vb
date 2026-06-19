@@ -1,6 +1,5 @@
 ﻿Imports System.IO
 Imports System.IO.Compression
-Imports System.Reflection
 Public Class Main
     Dim AssemblyName As String = Path.GetFileNameWithoutExtension(Environment.GetCommandLineArgs(0))
     Dim SessionFile As String = My.Application.Info.DirectoryPath & "\" & AssemblyName & ".$se"
@@ -24,6 +23,7 @@ Public Class Main
 
         Dim BinaryArchiveFilename As String = AssemblyName & ".bin"
         Dim ExpansionArchiveFilename As String = AssemblyName & ".xna"
+        Dim EnableArchievements As Boolean = False
         Dim LoadExpansions As Boolean = File.Exists(BinaryArchiveFilename) OrElse File.Exists(ExpansionArchiveFilename)
 
         Try
@@ -148,6 +148,8 @@ Public Class Main
                     If ConfigHeader = "[Saving]" AndAlso Line.StartsWith("DirectoryName=") Then
                         Dim CustomSaveDirectory As String = Line.Replace("DirectoryName=", "")
                         If CustomSaveDirectory <> "" Then CustomSavePath = DefaultSavePath & "\." & CustomSaveDirectory
+                    ElseIf ConfigHeader = "[Steam]" AndAlso Line.StartsWith("EnableArchievements=") Then
+                        EnableArchievements = CBool(Line.Replace("EnableArchievements=", ""))
                     ElseIf ConfigHeader = S("W0NyYWNrQ2hlY2td") AndAlso Line = S("SmFja1NwYXJyb3c9VHJ1ZQ??") Then
                         CrackCheck = False
                     End If
@@ -537,7 +539,10 @@ Public Class Main
         Try
             ' # START STARDEW VALLEY #
             Using StardewValley As New Process
-                If LoadExpansions Then
+                If EnableArchievements Then
+                    StardewValley.StartInfo.FileName = "steam://rungameid/413150"
+                    StardewValley.StartInfo.Arguments = """" & My.Application.Info.DirectoryPath & "\StardewModdingAPI.exe" & """" & " %command%"
+                ElseIf LoadExpansions Then
                     StardewValley.StartInfo.FileName = "StardewModdingAPI.exe"
                 Else
                     StardewValley.StartInfo.FileName = "Stardew Valley.exe"
